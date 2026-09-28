@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Viral Clip Finder</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <div>
+    <h1>🔥 Viral Clip Finder</h1>
+    <p>Temukan kandidat video yang sedang naik berdasarkan data YouTube.</p>
+  </div>
+</header>
+
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section class="panel">
+    <form action="/search" method="post" class="search-grid">
+      <label>Keyword
+        <input name="query" value="{{ query }}" placeholder="contoh: lucu, sepak bola, fakta" required>
+      </label>
+      <label>Region
+        <select name="region">
+          <option value="ID" {% if region=="ID" %}selected{% endif %}>Indonesia</option>
+          <option value="US" {% if region=="US" %}selected{% endif %}>United States</option>
+          <option value="GB" {% if region=="GB" %}selected{% endif %}>United Kingdom</option>
+          <option value="MY" {% if region=="MY" %}selected{% endif %}>Malaysia</option>
+        </select>
+      </label>
+      <label>Bahasa
+        <select name="language">
+          <option value="id" {% if language=="id" %}selected{% endif %}>Indonesia</option>
+          <option value="en" {% if language=="en" %}selected{% endif %}>English</option>
+        </select>
+      </label>
+      <label>Video maksimal umur
+        <select name="days">
+          {% for d in [1,3,7,14,30] %}
+          <option value="{{ d }}" {% if days==d %}selected{% endif %}>{{ d }} hari</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Urutan awal
+        <select name="order">
+          <option value="date" {% if order=="date" %}selected{% endif %}>Terbaru</option>
+          <option value="viewCount" {% if order=="viewCount" %}selected{% endif %}>Views</option>
+          <option value="relevance" {% if order=="relevance" %}selected{% endif %}>Relevansi</option>
+          <option value="rating" {% if order=="rating" %}selected{% endif %}>Rating</option>
+        </select>
+      </label>
+      <label>Jumlah
+        <select name="max_results">
+          <option>10</option><option selected>25</option><option>50</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="creative_commons"> Creative Commons saja</label>
+      <button type="submit">🔎 Cari & Analisis</button>
+    </form>
+  </section>
+
+  {% if videos %}
+  <section class="toolbar">
+    <strong>{{ videos|length }} kandidat ditemukan</strong>
+    <form id="exportForm" action="/export" method="post">
+      <input type="hidden" name="rows" id="rows">
+      <button type="submit" onclick="prepareExport()">⬇ Export CSV</button>
+    </form>
+  </section>
+
+  <section class="results">
+    {% for v in videos %}
+    <article class="card">
+      <img src="{{ v.thumbnail }}" alt="">
+      <div class="info">
+        <div class="score">{{ v.viral_score }}/100</div>
+        <h2>{{ loop.index }}. {{ v.title }}</h2>
+        <p class="channel">{{ v.channel }}</p>
+        <div class="stats">
+          <span>👁 {{ "{:,}".format(v.views) }}</span>
+          <span>👍 {{ "{:,}".format(v.likes) }}</span>
+          <span>💬 {{ "{:,}".format(v.comments) }}</span>
+          <span>⚡ {{ "{:,}".format(v.views_per_hour) }}/jam</span>
+          <span>📈 {{ v.engagement }}%</span>
+        </div>
+        <p class="license">Lisensi: {{ v.license }}</p>
+        <div class="actions">
+          <a href="{{ v.url }}" target="_blank">▶ YouTube</a>
+          <button onclick='showContent({{ v.id|tojson }}, {{ v.title|tojson }})'>✨ Hook & Caption</button>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+</main>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <button class="close" onclick="closeModal()">×</button>
+    <h2>✨ Ide Konten</h2>
+    <pre id="content"></pre>
+  </div>
+</div>
+
+<script>
+const videos = {{ videos|tojson }};
+function prepareExport() {
+  const rows = videos.map((v, i) => ({
+    rank: i + 1, title: v.title, channel: v.channel,
+    published_at: v.published_at, views: v.views, likes: v.likes,
+    comments: v.comments, engagement: v.engagement,
+    views_per_hour: v.views_per_hour, viral_score: v.viral_score,
+    license: v.license, url: v.url
+  }));
+  document.getElementById("rows").value = JSON.stringify(rows);
+}
+async function showContent(id, title) {
+  const r = await fetch(`/content/${id}?title=${encodeURIComponent(title)}`);
+  const data = await r.json();
+  document.getElementById("content").textContent =
+`HOOK:
+${data.hook}
+
+CAPTION:
+${data.caption}
+
+HASHTAG:
+${data.hashtags}
+
+CATATAN:
+${data.note}`;
+  document.getElementById("modal").classList.remove("hidden");
+}
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+}
+</script>
+</body>
+</html>
